@@ -1,0 +1,276 @@
+---
+title: "ggvis basics tutorial"
+author: "Max Grezlik"
+date: "2/3/2022"
+output: pdf_document
+---
+
+Following the tutorial at ggvis.rstudio.com/ggvis-basics.html
+
+```{r call in the packages needed}
+library(ggvis)
+library(dplyr)
+
+```
+
+
+```{r Dive into plotting with ggvis}
+#Every ggvis graphic starts with a call to ggvis(). The first argument is the data set that you want to plot, and the other arguments describe how to map variables to visual properties.
+
+p <- ggvis(mtcars, x = ~wt, y = ~mpg)
+
+# This doesn’t actually plot anything because you haven’t told ggvis how to display your data. You do that by layering visual elements, for example with layer_points():
+
+layer_points(p)
+
+#(If you’re not using RStudio, you’ll notice that this plot opens in your web browser. That’s because all ggvis graphics are web graphics, and need to be shown in the browser. RStudio includes a built-in browser so it can show you the plots directly.)
+
+#All ggvis functions take the visualisation as the first argument and return a modified visualisation. This seems a little bit awkward. Either you have to create temporary variables and modify them, or you have to use a lot of parentheses:
+
+layer_points(ggvis(mtcars, x = ~wt, y = ~mpg))
+
+#To make life easier ggvis uses the %>% (pronounced pipe) function from the magrittr package. That allows you to rewrite the previous function call as:
+
+mtcars %>%
+  ggvis(x = ~wt, y = ~mpg) %>%
+  layer_points()
+
+# Don’t worry if this looks a little strange at first. You’ll soon get used to it! This style of programming also allows gives you a lot of power when you start creating a lot of power, and allows you to seamlessly intermingle ggvis and dplyr code:
+
+mtcars %>%
+  ggvis(x = ~mpg, y = ~disp) %>%
+  mutate(disp = disp / 61.0237) %>% # convert engine displacement to liters
+  layer_points()
+
+# The format of the visual properties needs a little explanation. We use ~ before the variable name to indicate that we don’t want to literally use the value of the mpg variable (which doesn’t exist), but instead we want we want to use the mpg variable inside in the dataset. This is a common pattern in ggvis: we’ll always use formulas to refer to variables inside the dataset.
+
+#The first two arguments to ggvis() are usually the position, so by convention you can drop x and y:
+
+mtcars %>%
+  ggvis(~mpg, ~disp) %>%
+  layer_points()
+
+# You can add more variables to the plot by mapping them to other visual properties like fill, stroke, size and shape.
+
+mtcars %>% ggvis(~mpg, ~disp, stroke = ~vs) %>% layer_points()
+
+mtcars %>% ggvis(~mpg, ~disp, fill = ~vs) %>% layer_points()
+
+mtcars %>% ggvis(~mpg, ~disp, size = ~vs) %>% layer_points()
+
+mtcars %>% ggvis(~mpg, ~disp, shape = ~factor(cyl)) %>% layer_points()
+
+# If you want to make the points a fixed colour or size, you need to use := instead of =. The := operator means to use a raw, unscaled value. This seems like something that ggvis() should be able to figure out by itself, but making it explicit allows you to create some useful plots that you couldn’t otherwise. See the properties and scales for more details.
+
+mtcars %>% ggvis(~wt, ~mpg, fill := "red", stroke := "black") %>% layer_points()
+
+mtcars %>% ggvis(~wt, ~mpg, size := 300, opacity := 0.4) %>% layer_points()
+
+mtcars %>% ggvis(~wt, ~mpg, shape := "cross") %>% layer_points()
+```
+
+```{r Interaction}
+# As well as mapping visual properties to variables or setting them to specific values, you can also connect them to interactive controls.
+
+# The following example allows you to control the size and opacity of points with two sliders:
+
+mtcars %>% 
+  ggvis(~wt, ~mpg, 
+    size := input_slider(10, 100),
+    opacity := input_slider(0, 1)
+  ) %>% 
+  layer_points()
+
+# You can also connect interactive components to other plot parameters like the width and centers of histogram bins:
+
+mtcars %>% 
+  ggvis(~wt) %>% 
+  layer_histograms(width =  input_slider(0, 2, step = 0.10, label = "width"),
+                   center = input_slider(0, 2, step = 0.05, label = "center"))
+
+# Behind the scenes, interactive plots are built with shiny, and you can currently only have one running at a time in a given R session. To finish with a plot, press the stop button in Rstudio, or close the browser window and then press Escape or Ctrl + C in R.
+
+# As well as input_slider(), ggvis provides input_checkbox(), input_checkboxgroup(), input_numeric(), input_radiobuttons(), input_select() and input_text(). See the examples in the documentation for how you might use each one.
+
+# You can also use keyboard controls with left_right() and up_down(). Press the left and right arrows to control the size of the points in the next example.
+
+keys_s <- left_right(10, 1000, step = 50)
+mtcars %>% ggvis(~wt, ~mpg, size := keys_s, opacity := 0.5) %>% layer_points()
+
+# You can also add on more complex types of interaction like tooltips:
+
+mtcars %>% ggvis(~wt, ~mpg) %>% 
+  layer_points() %>% 
+  add_tooltip(function(df) df$wt)
+
+# You’ll learn more about complex interaction in the interactivity vignette.
+```
+```{r Simple layers}
+# So far, you seen two layer functions: layer_points() and layer_histograms(). There are many other layers, and they can be roughly categorised into two types:
+
+# Simple, which include primitives like points, lines and rectangles.
+
+# Compound, which combine data transformations with one or more simple layers.
+
+# All layer functions use the plural, not the singular. Think the verb, not the noun: I’m going to layer some points onto my plot.
+
+# There are five simple layers:
+
+# Points, layer_points(), with properties x, y, shape, stroke, fill, strokeOpacity, fillOpacity, and opacity.
+
+mtcars %>% ggvis(~wt, ~mpg) %>% layer_points()
+
+# Paths and polygons, layer_paths().
+
+df <- data.frame(x = 1:10, y = runif(10))
+df %>% ggvis(~x, ~y) %>% layer_paths()
+
+# If you supply a fill, you'll get a polygon
+
+t <- seq(0, 2 * pi, length = 100)
+df <- data.frame(x = sin(t), y = cos(t))
+df %>% ggvis(~x, ~y) %>% layer_paths(fill := "red")
+
+# Filled areas, layer_ribbons(). Use properties y and y2 to control the extent of the area.
+
+df <- data.frame(x = 1:10, y = runif(10))
+df %>% ggvis(~x, ~y) %>% layer_ribbons()
+
+df %>% ggvis(~x, ~y + 0.1, y2 = ~y - 0.1) %>% layer_ribbons()
+
+# Rectangles, layer_rects(). The location and size of the rectangle is controlled by the x, x2, y and y2 properties.
+
+set.seed(1014)
+df <- data.frame(x1 = runif(5), x2 = runif(5), y1 = runif(5), y2 = runif(5))
+df %>% ggvis(~x1, ~y1, x2 = ~x2, y2 = ~y2, fillOpacity := 0.1) %>% layer_rects()
+
+# Text, layer_text(). The text layer has many new options to control the apperance of the text: text (the label), dx and dy (margin in pixels between text and anchor point), angle (rotate the text), font (font name), fontSize (size in pixels), fontWeight (e.g. bold or normal), fontStyle (e.g. italic or normal.)
+
+df <- data.frame(x = 3:1, y = c(1, 3, 2), label = c("a", "b", "c"))
+df %>% ggvis(~x, ~y, text := ~label) %>% layer_text()
+
+df %>% ggvis(~x, ~y, text := ~label) %>% layer_text(fontSize := 50)
+
+df %>% ggvis(~x, ~y, text := ~label) %>% layer_text(angle := 45)
+```
+```{r Compound layers}
+# The four most common compound layers are:
+# 
+# layer_lines() which automatically orders by the x variable:
+
+t <- seq(0, 2 * pi, length = 20)
+df <- data.frame(x = sin(t), y = cos(t))
+df %>% ggvis(~x, ~y) %>% layer_paths()
+
+df %>% ggvis(~x, ~y) %>% layer_lines()
+
+# layer_lines() is equivalent to arrange() + layer_paths():
+
+df %>% ggvis(~x, ~y) %>% arrange(x) %>% layer_paths()
+
+# layer_histograms() and layer_freqpolys() which allows you to explore the distribution of continuous. Both layers first bin the data with compute_bin() then display the results with either rects or lines.
+
+mtcars %>% ggvis(~mpg) %>% layer_histograms()
+
+# Or equivalently
+binned <- mtcars %>% compute_bin(~mpg) 
+
+binned %>% 
+  ggvis(x = ~xmin_, x2 = ~xmax_, y2 = 0, y = ~count_, fill := "black") %>%
+  layer_rects()
+
+# layer_smooths() fits a smooth model to the data, and displays predictions with a line. It’s used to highlight the trend in noisy data:
+
+mtcars %>% ggvis(~wt, ~mpg) %>% layer_smooths()
+
+# Or equivalently
+smoothed <- mtcars %>% compute_smooth(mpg ~ wt)
+smoothed %>% ggvis(~pred_, ~resp_) %>% layer_paths()
+
+# You can control the degree of wiggliness with the span parameter:
+
+span <- input_slider(0.2, 1, value = 0.75)
+mtcars %>% ggvis(~wt, ~mpg) %>% layer_smooths(span = span)
+
+# You can learn more about layers in the layers vignette.
+```
+```{r Multiple layers}
+# Rich graphics can be created by combining multiple layers on the same plot. This easier to do: just layer on multiple elements:
+
+mtcars %>% 
+  ggvis(~wt, ~mpg) %>% 
+  layer_smooths() %>% 
+  layer_points()
+
+# You could use this approach to add two smoothers with varying degrees of wiggliness:
+
+mtcars %>% ggvis(~wt, ~mpg) %>%
+  layer_smooths(span = 1) %>%
+  layer_smooths(span = 0.3, stroke := "red")
+
+# You’ll learn more about building up rich hierarchical graphics in data hierarchy.
+
+# More details
+# There are other optional components that you can include:
+# 
+# scales, to control the mapping between data and visual properties. These are described in the properties and scales vignette.
+# 
+# legends and axes to control the appearance of the guides produced by the scales. See the axes and legends vignette for more details.
+```
+```{r sandbox with the package}
+
+head(airquality)
+
+airquality %>% 
+  ggvis(~Wind, ~Temp) %>% 
+  layer_smooths() %>% 
+  layer_points()
+
+airquality %>% 
+  ggvis(~Ozone) %>% 
+  layer_histograms(width =  input_slider(1, 20, step = 1, label = "width"))
+
+head(ChickWeight)
+
+ChickWeight %>% 
+  ggvis(~weight, ~Time) %>% 
+  layer_smooths() %>% 
+  layer_points()
+
+ChickWeight %>% 
+  ggvis(~weight) %>% 
+  layer_histograms(width =  input_slider(1, 20, step = 1, label = "width"))
+
+span <- input_slider(0.2, 1, value = 0.75)
+ChickWeight %>% ggvis(~weight, ~Time) %>% layer_smooths(span = span,stroke := "red")%>% 
+  layer_points()
+
+
+# Trying to pull in a 3rd variable into the plot. Its not working
+
+# Amanda Hart had some success using the "props" function
+
+selection <- input_select(c("1" = "1", "2"="2",
+                                 "3" = "3", "4"="4"),
+                                 label = "Chick")
+ChickWeight %>% 
+  filter(Chick :=selection) %>% 
+  ggvis(~weight, ~Time) %>% 
+  layer_smooths() %>% 
+  layer_points(fill := selection)
+
+ChickWeight %>% 
+  ggvis(~weight, ~Time) %>% 
+  layer_points() %>% 
+  props(fill=input_select(c("1","2","3","4")))
+
+
+
+
+
+
+
+```
+
+
+
